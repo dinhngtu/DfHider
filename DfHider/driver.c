@@ -9,11 +9,6 @@ DRIVER_INITIALIZE DriverEntry;
 #pragma warning(pop)
 DF_FILTER_DATA g_DfHiderData;
 
-#ifdef ALLOC_PRAGMA
-#pragma alloc_text(INIT, DriverEntry)
-#pragma alloc_text(PAGE, DfUnload)
-#endif
-
 static CONST FLT_CONTEXT_REGISTRATION ContextRegistration[] = {
     {
         FLT_INSTANCE_CONTEXT,
@@ -99,8 +94,6 @@ DfUnload(
 )
 {
     UNREFERENCED_PARAMETER(Flags);
-
-    PAGED_CODE();
 
     FltUnregisterFilter(g_DfHiderData.FilterHandle);
 

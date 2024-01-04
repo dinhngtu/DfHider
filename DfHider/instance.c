@@ -2,11 +2,6 @@
 
 DECLARE_GLOBAL_CONST_UNICODE_STRING(g_DfP9DeviceName, L"\\Device\\P9Rdr");
 
-#ifdef ALLOC_PRAGMA
-#pragma alloc_text(PAGE, DfInstanceSetup)
-#pragma alloc_text(PAGE, DfQueryTeardown)
-#endif
-
 NTSTATUS
 FLTAPI
 DfInstanceSetup(
@@ -24,13 +19,11 @@ DfInstanceSetup(
     UNREFERENCED_PARAMETER(Flags);
     UNREFERENCED_PARAMETER(VolumeDeviceType);
 
-    PAGED_CODE();
-
     status = FltAllocateContext(
         FltObjects->Filter,
         FLT_INSTANCE_CONTEXT,
         sizeof(DF_INSTANCE_CONTEXT),
-        PagedPool,
+        NonPagedPoolNx,
         &instance);
     if (!NT_SUCCESS(status))
         return status;
@@ -79,8 +72,6 @@ DfQueryTeardown(
 {
     UNREFERENCED_PARAMETER(FltObjects);
     UNREFERENCED_PARAMETER(Flags);
-
-    PAGED_CODE();
 
     return STATUS_SUCCESS;
 }

@@ -1,12 +1,6 @@
 #include "callbacks.h"
 #include "instance.h"
 
-#ifdef ALLOC_PRAGMA
-#pragma alloc_text(PAGE, DfPostCreate)
-#pragma alloc_text(PAGE, DfPostQueryInformation)
-#pragma alloc_text(PAGE, DfPostDirectoryControl)
-#endif
-
 static BOOLEAN DfIsHiddenName(CONST PFLT_FILE_NAME_INFORMATION fnInfo) {
     if (!(fnInfo->NamesParsed & FLTFL_FILE_NAME_PARSED_STREAM) || !fnInfo->Stream.Length)
     {
@@ -56,8 +50,6 @@ DfPostCreate(
     UNREFERENCED_PARAMETER(FltObjects);
     UNREFERENCED_PARAMETER(CompletionContext);
     UNREFERENCED_PARAMETER(Flags);
-
-    PAGED_CODE();
 
     if (!NT_SUCCESS(status) ||
         (status == STATUS_REPARSE) ||
@@ -137,8 +129,6 @@ DfPostQueryInformation(
     UNREFERENCED_PARAMETER(CompletionContext);
     UNREFERENCED_PARAMETER(Flags);
 
-    PAGED_CODE();
-
     if (!NT_SUCCESS(status))
         return FLT_POSTOP_FINISHED_PROCESSING;
 
@@ -210,8 +200,6 @@ DfPostDirectoryControl(
     UNREFERENCED_PARAMETER(FltObjects);
     UNREFERENCED_PARAMETER(CompletionContext);
     UNREFERENCED_PARAMETER(Flags);
-
-    PAGED_CODE();
 
     if (Data->Iopb->MinorFunction != IRP_MN_QUERY_DIRECTORY)
         return FLT_POSTOP_FINISHED_PROCESSING;
