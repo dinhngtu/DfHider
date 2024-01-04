@@ -18,6 +18,7 @@ DfInstanceSetup(
 {
     NTSTATUS status;
     PDF_INSTANCE_CONTEXT instance = NULL;
+    BOOLEAN writable;
 
     UNREFERENCED_PARAMETER(FltObjects);
     UNREFERENCED_PARAMETER(Flags);
@@ -36,15 +37,23 @@ DfInstanceSetup(
 
     DbgPrint("DfHider attaching %#lx fs type %d\n", VolumeDeviceType, VolumeFilesystemType);
 
-    instance->IsDisk = VolumeDeviceType == FILE_DEVICE_DISK_FILE_SYSTEM;
+    status = FltIsVolumeWritable(FltObjects->Volume, &writable);
+    if (!NT_SUCCESS(status))
+        goto exit;
+    instance->IsLocal = VolumeDeviceType != FILE_DEVICE_NETWORK_FILE_SYSTEM;
     instance->IsMup = VolumeFilesystemType == FLT_FSTYPE_MUP;
     if (instance->IsMup) {
         status = FsRtlMupGetProviderIdFromName(&g_DfP9DeviceName, &instance->P9ProviderId);
         if (!NT_SUCCESS(status)) {
             DbgPrint("cannot find P9Rdr: %#lx\n", status);
-            instance->IsMup = FALSE; // don't filter this instance due to failure
+            status = STATUS_FLT_DO_NOT_ATTACH;
+            goto exit;
         }
         //DbgPrint("P9Rdr is %#x\n", instance->P9ProviderId);
+    }
+    else if (!instance->IsLocal || !writable) {
+        status = STATUS_FLT_DO_NOT_ATTACH;
+        goto exit;
     }
     status = FltSetInstanceContext(
         FltObjects->Instance,
@@ -56,8 +65,8 @@ DfInstanceSetup(
         status = STATUS_FLT_DO_NOT_ATTACH;
     }
 
+exit:
     FltReleaseContext(instance);
-
     return status;
 }
 

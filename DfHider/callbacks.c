@@ -69,7 +69,7 @@ DfPostCreate(
     if (!NT_SUCCESS(status))
         return FLT_POSTOP_FINISHED_PROCESSING;
 
-    if (!instance->IsDisk)
+    if (!instance->IsLocal)
         goto done_context;
 
     status = DfGetParsedFileName(

@@ -3,7 +3,7 @@
 #include "stdafx.h"
 
 typedef struct _DF_INSTANCE_CONTEXT {
-    BOOLEAN IsDisk;
+    BOOLEAN IsLocal;
     BOOLEAN IsMup;
     UINT32 P9ProviderId;
 } DF_INSTANCE_CONTEXT, * PDF_INSTANCE_CONTEXT;
