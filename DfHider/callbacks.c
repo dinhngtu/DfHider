@@ -1,12 +1,11 @@
+#include "stdafx.h"
 #include "callbacks.h"
 #include "instance.h"
 
 static BOOLEAN DfIsHiddenName(CONST PFLT_FILE_NAME_INFORMATION fnInfo) {
     if (!(fnInfo->NamesParsed & FLTFL_FILE_NAME_PARSED_STREAM) || !fnInfo->Stream.Length)
-    {
         if (fnInfo->FinalComponent.Length > 0 && fnInfo->FinalComponent.Buffer[0] == L'.')
             return TRUE;
-    }
     return FALSE;
 }
 
@@ -35,81 +34,6 @@ static NTSTATUS DfGetParsedFileName(
 
 FLT_POSTOP_CALLBACK_STATUS
 FLTAPI
-DfPostCreate(
-    _Inout_ PFLT_CALLBACK_DATA Data,
-    _In_ PCFLT_RELATED_OBJECTS FltObjects,
-    _In_opt_ PVOID CompletionContext,
-    _In_ FLT_POST_OPERATION_FLAGS Flags
-)
-{
-    NTSTATUS status = Data->IoStatus.Status;
-    PDF_INSTANCE_CONTEXT instance = NULL;
-    PFLT_FILE_NAME_INFORMATION fnInfo = NULL;
-    FILE_BASIC_INFORMATION fileInfo = { 0 };
-
-    UNREFERENCED_PARAMETER(FltObjects);
-    UNREFERENCED_PARAMETER(CompletionContext);
-    UNREFERENCED_PARAMETER(Flags);
-
-    if (!NT_SUCCESS(status) ||
-        (status == STATUS_REPARSE) ||
-        (Data->IoStatus.Information != FILE_CREATED &&
-            Data->IoStatus.Information != FILE_SUPERSEDED))
-        return FLT_POSTOP_FINISHED_PROCESSING;
-
-    status = FltGetInstanceContext(FltObjects->Instance, &instance);
-    if (!NT_SUCCESS(status))
-        return FLT_POSTOP_FINISHED_PROCESSING;
-
-    if (!instance->IsLocal)
-        goto done_context;
-
-    status = DfGetParsedFileName(
-        Data,
-        FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT,
-        &fnInfo);
-    if (!NT_SUCCESS(status))
-        goto done_context;
-
-    if (!DfIsHiddenName(fnInfo))
-        goto done_fnInfo;
-
-    status = FltQueryInformationFile(
-        FltObjects->Instance,
-        FltObjects->FileObject,
-        &fileInfo,
-        sizeof(fileInfo),
-        FileBasicInformation,
-        NULL);
-    if (!NT_SUCCESS(status)) {
-        DbgPrint("FltQueryInformationFile failed: %#lx", status);
-        goto done_fnInfo;
-    }
-
-    if (fileInfo.FileAttributes & FILE_ATTRIBUTE_HIDDEN)
-        goto done_fnInfo;
-    fileInfo.FileAttributes |= FILE_ATTRIBUTE_HIDDEN;
-
-    status = FltSetInformationFile(
-        FltObjects->Instance,
-        FltObjects->FileObject,
-        &fileInfo,
-        sizeof(fileInfo),
-        FileBasicInformation);
-    if (!NT_SUCCESS(status)) {
-        DbgPrint("FltSetInformationFile failed: %#lx", status);
-        goto done_fnInfo;
-    }
-
-done_fnInfo:
-    FltReleaseFileNameInformation(fnInfo);
-done_context:
-    FltReleaseContext(instance);
-    return FLT_POSTOP_FINISHED_PROCESSING;
-}
-
-FLT_POSTOP_CALLBACK_STATUS
-FLTAPI
 DfPostQueryInformation(
     _Inout_ PFLT_CALLBACK_DATA Data,
     _In_ PCFLT_RELATED_OBJECTS FltObjects,
@@ -125,7 +49,6 @@ DfPostQueryInformation(
     FILE_INFORMATION_CLASS infoClass = Data->Iopb->Parameters.QueryFileInformation.FileInformationClass;
     PVOID infoBuffer = Data->Iopb->Parameters.QueryFileInformation.InfoBuffer;
 
-    UNREFERENCED_PARAMETER(FltObjects);
     UNREFERENCED_PARAMETER(CompletionContext);
     UNREFERENCED_PARAMETER(Flags);
 
@@ -181,6 +104,18 @@ done_context:
     return FLT_POSTOP_FINISHED_PROCESSING;
 }
 
+#define DO_HIDE_FILE(T, data, infoBuffer) \
+    { \
+        T di = (infoBuffer); \
+        while ((ULONG_PTR)(di + 1) <= (ULONG_PTR)(infoBuffer) + (data)->Iopb->Parameters.DirectoryControl.QueryDirectory.Length) { \
+            if (di->FileNameLength >= sizeof(WCHAR) && di->FileName[0] == L'.') \
+                di->FileAttributes |= FILE_ATTRIBUTE_HIDDEN; \
+            if (!di->NextEntryOffset) \
+                break; \
+            di = (T)((ULONG_PTR)di + di->NextEntryOffset); \
+        } \
+    }
+
 FLT_POSTOP_CALLBACK_STATUS
 FLTAPI
 DfPostDirectoryControl(
@@ -226,61 +161,21 @@ DfPostDirectoryControl(
     infoBuffer = Data->Iopb->Parameters.DirectoryControl.QueryDirectory.DirectoryBuffer;
 
     switch (infoClass) {
-    case FileBothDirectoryInformation: {
-        PFILE_BOTH_DIR_INFORMATION di = infoBuffer;
-        while ((ULONG_PTR)(di + 1) <= (ULONG_PTR)infoBuffer + Data->Iopb->Parameters.DirectoryControl.QueryDirectory.Length) {
-            if (di->FileNameLength >= sizeof(WCHAR) && di->FileName[0] == L'.')
-                di->FileAttributes |= FILE_ATTRIBUTE_HIDDEN;
-            if (!di->NextEntryOffset)
-                break;
-            di = (PFILE_BOTH_DIR_INFORMATION)((ULONG_PTR)di + di->NextEntryOffset);
-        }
+    case FileBothDirectoryInformation:
+        DO_HIDE_FILE(PFILE_BOTH_DIR_INFORMATION, Data, infoBuffer);
         break;
-    }
-    case FileDirectoryInformation: {
-        PFILE_DIRECTORY_INFORMATION di = infoBuffer;
-        while ((ULONG_PTR)(di + 1) <= (ULONG_PTR)infoBuffer + Data->Iopb->Parameters.DirectoryControl.QueryDirectory.Length) {
-            if (di->FileNameLength >= sizeof(WCHAR) && di->FileName[0] == L'.')
-                di->FileAttributes |= FILE_ATTRIBUTE_HIDDEN;
-            if (!di->NextEntryOffset)
-                break;
-            di = (PFILE_DIRECTORY_INFORMATION)((ULONG_PTR)di + di->NextEntryOffset);
-        }
+    case FileDirectoryInformation:
+        DO_HIDE_FILE(PFILE_DIRECTORY_INFORMATION, Data, infoBuffer);
         break;
-    }
-    case FileFullDirectoryInformation: {
-        PFILE_FULL_DIR_INFORMATION di = infoBuffer;
-        while ((ULONG_PTR)(di + 1) <= (ULONG_PTR)infoBuffer + Data->Iopb->Parameters.DirectoryControl.QueryDirectory.Length) {
-            if (di->FileNameLength >= sizeof(WCHAR) && di->FileName[0] == L'.')
-                di->FileAttributes |= FILE_ATTRIBUTE_HIDDEN;
-            if (!di->NextEntryOffset)
-                break;
-            di = (PFILE_FULL_DIR_INFORMATION)((ULONG_PTR)di + di->NextEntryOffset);
-        }
+    case FileFullDirectoryInformation:
+        DO_HIDE_FILE(PFILE_FULL_DIR_INFORMATION, Data, infoBuffer);
         break;
-    }
-    case FileIdBothDirectoryInformation: {
-        PFILE_ID_BOTH_DIR_INFORMATION di = infoBuffer;
-        while ((ULONG_PTR)(di + 1) <= (ULONG_PTR)infoBuffer + Data->Iopb->Parameters.DirectoryControl.QueryDirectory.Length) {
-            if (di->FileNameLength >= sizeof(WCHAR) && di->FileName[0] == L'.')
-                di->FileAttributes |= FILE_ATTRIBUTE_HIDDEN;
-            if (!di->NextEntryOffset)
-                break;
-            di = (PFILE_ID_BOTH_DIR_INFORMATION)((ULONG_PTR)di + di->NextEntryOffset);
-        }
+    case FileIdBothDirectoryInformation:
+        DO_HIDE_FILE(PFILE_ID_BOTH_DIR_INFORMATION, Data, infoBuffer);
         break;
-    }
-    case FileIdFullDirectoryInformation: {
-        PFILE_ID_FULL_DIR_INFORMATION di = infoBuffer;
-        while ((ULONG_PTR)(di + 1) <= (ULONG_PTR)infoBuffer + Data->Iopb->Parameters.DirectoryControl.QueryDirectory.Length) {
-            if (di->FileNameLength >= sizeof(WCHAR) && di->FileName[0] == L'.')
-                di->FileAttributes |= FILE_ATTRIBUTE_HIDDEN;
-            if (!di->NextEntryOffset)
-                break;
-            di = (PFILE_ID_FULL_DIR_INFORMATION)((ULONG_PTR)di + di->NextEntryOffset);
-        }
+    case FileIdFullDirectoryInformation:
+        DO_HIDE_FILE(PFILE_ID_FULL_DIR_INFORMATION, Data, infoBuffer);
         break;
-    }
     default:
         break;
     }
@@ -289,3 +184,5 @@ done_context:
     FltReleaseContext(instance);
     return FLT_POSTOP_FINISHED_PROCESSING;
 }
+
+#undef DO_HIDE_FILE

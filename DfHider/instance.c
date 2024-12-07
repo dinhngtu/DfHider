@@ -1,3 +1,4 @@
+#include "stdafx.h"
 #include "instance.h"
 
 DECLARE_GLOBAL_CONST_UNICODE_STRING(g_DfP9DeviceName, L"\\Device\\P9Rdr");
@@ -13,11 +14,8 @@ DfInstanceSetup(
 {
     NTSTATUS status;
     PDF_INSTANCE_CONTEXT instance = NULL;
-    BOOLEAN writable;
 
-    UNREFERENCED_PARAMETER(FltObjects);
     UNREFERENCED_PARAMETER(Flags);
-    UNREFERENCED_PARAMETER(VolumeDeviceType);
 
     status = FltAllocateContext(
         FltObjects->Filter,
@@ -30,24 +28,19 @@ DfInstanceSetup(
 
     DbgPrint("DfHider attaching %#lx fs type %d\n", VolumeDeviceType, VolumeFilesystemType);
 
-    status = FltIsVolumeWritable(FltObjects->Volume, &writable);
-    if (!NT_SUCCESS(status))
-        goto exit;
-    instance->IsLocal = VolumeDeviceType != FILE_DEVICE_NETWORK_FILE_SYSTEM;
-    instance->IsMup = VolumeFilesystemType == FLT_FSTYPE_MUP;
-    if (instance->IsMup) {
-        status = FsRtlMupGetProviderIdFromName(&g_DfP9DeviceName, &instance->P9ProviderId);
-        if (!NT_SUCCESS(status)) {
-            DbgPrint("cannot find P9Rdr: %#lx\n", status);
-            status = STATUS_FLT_DO_NOT_ATTACH;
-            goto exit;
-        }
-        //DbgPrint("P9Rdr is %#x\n", instance->P9ProviderId);
-    }
-    else if (!instance->IsLocal || !writable) {
+    if (VolumeDeviceType != FILE_DEVICE_NETWORK_FILE_SYSTEM || VolumeFilesystemType != FLT_FSTYPE_MUP) {
         status = STATUS_FLT_DO_NOT_ATTACH;
         goto exit;
     }
+
+    status = FsRtlMupGetProviderIdFromName(&g_DfP9DeviceName, &instance->P9ProviderId);
+    if (!NT_SUCCESS(status)) {
+        DbgPrint("cannot find P9Rdr: %#lx\n", status);
+        status = STATUS_FLT_DO_NOT_ATTACH;
+        goto exit;
+    }
+    //DbgPrint("P9Rdr is %#x\n", instance->P9ProviderId);
+
     status = FltSetInstanceContext(
         FltObjects->Instance,
         FLT_SET_CONTEXT_KEEP_IF_EXISTS,
@@ -56,6 +49,7 @@ DfInstanceSetup(
     if (!NT_SUCCESS(status)) {
         DbgPrint("cannot attach %#lx\n", status);
         status = STATUS_FLT_DO_NOT_ATTACH;
+        goto exit;
     }
 
 exit:

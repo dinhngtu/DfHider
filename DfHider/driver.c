@@ -3,10 +3,6 @@
 #include "instance.h"
 #include "callbacks.h"
 
-#pragma warning(push)
-#pragma warning(disable: 28251)
-DRIVER_INITIALIZE DriverEntry;
-#pragma warning(pop)
 DF_FILTER_DATA g_DfHiderData;
 
 static CONST FLT_CONTEXT_REGISTRATION ContextRegistration[] = {
@@ -21,12 +17,6 @@ static CONST FLT_CONTEXT_REGISTRATION ContextRegistration[] = {
 };
 
 static CONST FLT_OPERATION_REGISTRATION Callbacks[] = {
-    {
-        IRP_MJ_CREATE,
-        0,
-        NULL,
-        DfPostCreate
-    },
     {
         IRP_MJ_QUERY_INFORMATION,
         0,
@@ -62,10 +52,11 @@ static CONST FLT_REGISTRATION FilterRegistration = {
     .NormalizeContextCleanupCallback = NULL
 };
 
+_Use_decl_annotations_
 NTSTATUS
 DriverEntry(
-    _In_ PDRIVER_OBJECT DriverObject,
-    _In_ PUNICODE_STRING RegistryPath
+    PDRIVER_OBJECT DriverObject,
+    PUNICODE_STRING RegistryPath
 )
 {
     NTSTATUS status;

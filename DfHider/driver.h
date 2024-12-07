@@ -8,11 +8,7 @@ typedef struct _DF_FILTER_DATA {
     PFLT_FILTER FilterHandle;
 } DF_FILTER_DATA, * PDF_FILTER_DATA;
 
-NTSTATUS
-DriverEntry(
-    _In_ PDRIVER_OBJECT DriverObject,
-    _In_ PUNICODE_STRING RegistryPath
-);
+DRIVER_INITIALIZE DriverEntry;
 
 NTSTATUS
 FLTAPI
