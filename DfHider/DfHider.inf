@@ -83,4 +83,4 @@ DiskId1                 = "DfHider Device Installation Disk"
 DefaultInstance         = "DfHider Instance"
 Instance1.Name          = "DfHider Instance"
 Instance1.Altitude      = "268888"
-Instance1.Flags         = 0x1          ; Suppress automatic attachments
+Instance1.Flags         = 0x0          ; Allow automatic attachments
