@@ -2,7 +2,8 @@
 #include "callbacks.h"
 #include "instance.h"
 
-static BOOLEAN DfIsHiddenName(CONST PFLT_FILE_NAME_INFORMATION fnInfo) {
+static BOOLEAN DfIsHiddenName(CONST PFLT_FILE_NAME_INFORMATION fnInfo)
+{
     if (!(fnInfo->NamesParsed & FLTFL_FILE_NAME_PARSED_STREAM) || !fnInfo->Stream.Length)
         if (fnInfo->FinalComponent.Length > 0 && fnInfo->FinalComponent.Buffer[0] == L'.')
             return TRUE;
@@ -13,7 +14,8 @@ static NTSTATUS DfGetParsedFileName(
     _In_ PFLT_CALLBACK_DATA CallbackData,
     _In_ FLT_FILE_NAME_OPTIONS NameOptions,
     _Outptr_ PFLT_FILE_NAME_INFORMATION* FileNameInformation
-) {
+)
+{
     NTSTATUS status;
     *FileNameInformation = NULL;
 
@@ -46,8 +48,8 @@ DfPostQueryInformation(
     FSRTL_MUP_PROVIDER_INFO_LEVEL_1 mupProvider = { 0 };
     ULONG mupProviderSize = sizeof(mupProvider);
     PFLT_FILE_NAME_INFORMATION fnInfo = NULL;
-    FILE_INFORMATION_CLASS infoClass = Data->Iopb->Parameters.QueryFileInformation.FileInformationClass;
-    PVOID infoBuffer = Data->Iopb->Parameters.QueryFileInformation.InfoBuffer;
+    FILE_INFORMATION_CLASS infoClass;
+    PVOID infoBuffer;
 
     UNREFERENCED_PARAMETER(CompletionContext);
     UNREFERENCED_PARAMETER(Flags);
@@ -83,6 +85,9 @@ DfPostQueryInformation(
     if (!DfIsHiddenName(fnInfo))
         goto done_fnInfo;
 
+    infoClass = Data->Iopb->Parameters.QueryFileInformation.FileInformationClass;
+    infoBuffer = Data->Iopb->Parameters.QueryFileInformation.InfoBuffer;
+
     switch (infoClass) {
     case FileBasicInformation:
         ((PFILE_BASIC_INFORMATION)infoBuffer)->FileAttributes |= FILE_ATTRIBUTE_HIDDEN;
@@ -104,10 +109,10 @@ done_context:
     return FLT_POSTOP_FINISHED_PROCESSING;
 }
 
-#define DO_HIDE_FILE(T, data, infoBuffer) \
+#define DO_HIDE_FILE(T, infoLength, infoBuffer) \
     { \
         T di = (infoBuffer); \
-        while ((ULONG_PTR)(di + 1) <= (ULONG_PTR)(infoBuffer) + (data)->Iopb->Parameters.DirectoryControl.QueryDirectory.Length) { \
+        while ((ULONG_PTR)(di + 1) <= (ULONG_PTR)(infoBuffer) + infoLength) { \
             if (di->FileNameLength >= sizeof(WCHAR) && di->FileName[0] == L'.') \
                 di->FileAttributes |= FILE_ATTRIBUTE_HIDDEN; \
             if (!di->NextEntryOffset) \
@@ -129,10 +134,10 @@ DfPostDirectoryControl(
     FSRTL_MUP_PROVIDER_INFO_LEVEL_1 mupProvider = { 0 };
     ULONG mupProviderSize = sizeof(mupProvider);
     PDF_INSTANCE_CONTEXT instance = NULL;
+    ULONG infoLength;
     FILE_INFORMATION_CLASS infoClass;
     PVOID infoBuffer;
 
-    UNREFERENCED_PARAMETER(FltObjects);
     UNREFERENCED_PARAMETER(CompletionContext);
     UNREFERENCED_PARAMETER(Flags);
 
@@ -157,24 +162,25 @@ DfPostDirectoryControl(
     if (mupProvider.ProviderId != instance->P9ProviderId)
         goto done_context;
 
+    infoLength = Data->Iopb->Parameters.DirectoryControl.QueryDirectory.Length;
     infoClass = Data->Iopb->Parameters.DirectoryControl.QueryDirectory.FileInformationClass;
     infoBuffer = Data->Iopb->Parameters.DirectoryControl.QueryDirectory.DirectoryBuffer;
 
     switch (infoClass) {
     case FileBothDirectoryInformation:
-        DO_HIDE_FILE(PFILE_BOTH_DIR_INFORMATION, Data, infoBuffer);
+        DO_HIDE_FILE(PFILE_BOTH_DIR_INFORMATION, infoLength, infoBuffer);
         break;
     case FileDirectoryInformation:
-        DO_HIDE_FILE(PFILE_DIRECTORY_INFORMATION, Data, infoBuffer);
+        DO_HIDE_FILE(PFILE_DIRECTORY_INFORMATION, infoLength, infoBuffer);
         break;
     case FileFullDirectoryInformation:
-        DO_HIDE_FILE(PFILE_FULL_DIR_INFORMATION, Data, infoBuffer);
+        DO_HIDE_FILE(PFILE_FULL_DIR_INFORMATION, infoLength, infoBuffer);
         break;
     case FileIdBothDirectoryInformation:
-        DO_HIDE_FILE(PFILE_ID_BOTH_DIR_INFORMATION, Data, infoBuffer);
+        DO_HIDE_FILE(PFILE_ID_BOTH_DIR_INFORMATION, infoLength, infoBuffer);
         break;
     case FileIdFullDirectoryInformation:
-        DO_HIDE_FILE(PFILE_ID_FULL_DIR_INFORMATION, Data, infoBuffer);
+        DO_HIDE_FILE(PFILE_ID_FULL_DIR_INFORMATION, infoLength, infoBuffer);
         break;
     default:
         break;

@@ -43,7 +43,7 @@ static CONST FLT_REGISTRATION FilterRegistration = {
     .FilterUnloadCallback = DfUnload,
 
     .InstanceSetupCallback = DfInstanceSetup,
-    .InstanceQueryTeardownCallback = DfQueryTeardown,
+    .InstanceQueryTeardownCallback = DfInstanceQueryTeardown,
     .InstanceTeardownStartCallback = NULL,
     .InstanceTeardownCompleteCallback = NULL,
 
@@ -52,18 +52,21 @@ static CONST FLT_REGISTRATION FilterRegistration = {
     .NormalizeContextCleanupCallback = NULL
 };
 
-_Use_decl_annotations_
+_Function_class_(DRIVER_INITIALIZE)
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 NTSTATUS
 DriverEntry(
-    PDRIVER_OBJECT DriverObject,
-    PUNICODE_STRING RegistryPath
+    _In_ PDRIVER_OBJECT DriverObject,
+    _In_ PUNICODE_STRING RegistryPath
 )
 {
     NTSTATUS status;
 
     UNREFERENCED_PARAMETER(RegistryPath);
 
-    status = FltRegisterFilter(DriverObject,
+    status = FltRegisterFilter(
+        DriverObject,
         &FilterRegistration,
         &g_DfHiderData.FilterHandle);
 
