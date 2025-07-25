@@ -5,7 +5,8 @@
 
 DF_FILTER_DATA g_DfHiderData;
 
-static CONST FLT_CONTEXT_REGISTRATION ContextRegistration[] = {
+static CONST FLT_CONTEXT_REGISTRATION
+ContextRegistration[] = {
     {
         FLT_INSTANCE_CONTEXT,
         0,
@@ -16,7 +17,8 @@ static CONST FLT_CONTEXT_REGISTRATION ContextRegistration[] = {
     { FLT_CONTEXT_END }
 };
 
-static CONST FLT_OPERATION_REGISTRATION Callbacks[] = {
+static CONST FLT_OPERATION_REGISTRATION
+Callbacks[] = {
     {
         IRP_MJ_QUERY_INFORMATION,
         0,
@@ -32,7 +34,8 @@ static CONST FLT_OPERATION_REGISTRATION Callbacks[] = {
     { IRP_MJ_OPERATION_END }
 };
 
-static CONST FLT_REGISTRATION FilterRegistration = {
+static CONST FLT_REGISTRATION
+FilterRegistration = {
     .Size = sizeof(FLT_REGISTRATION),
     .Version = FLT_REGISTRATION_VERSION,
     .Flags = 0,
