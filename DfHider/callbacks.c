@@ -110,16 +110,16 @@ done_context:
 }
 
 #define DO_HIDE_FILE(T, infoLength, infoBuffer) \
-    { \
+    do { \
         T di = (infoBuffer); \
-        while ((ULONG_PTR)(di + 1) <= (ULONG_PTR)(infoBuffer) + infoLength) { \
+        while ((ULONG_PTR)(di + 1) <= (ULONG_PTR)(infoBuffer) + (ULONG_PTR)(infoLength)) { \
             if (di->FileNameLength >= sizeof(WCHAR) && di->FileName[0] == L'.') \
                 di->FileAttributes |= FILE_ATTRIBUTE_HIDDEN; \
             if (!di->NextEntryOffset) \
                 break; \
             di = (T)((ULONG_PTR)di + di->NextEntryOffset); \
         } \
-    }
+    } while (0)
 
 FLT_POSTOP_CALLBACK_STATUS
 FLTAPI
@@ -167,14 +167,14 @@ DfPostDirectoryControl(
     infoBuffer = Data->Iopb->Parameters.DirectoryControl.QueryDirectory.DirectoryBuffer;
 
     switch (infoClass) {
-    case FileBothDirectoryInformation:
-        DO_HIDE_FILE(PFILE_BOTH_DIR_INFORMATION, infoLength, infoBuffer);
-        break;
     case FileDirectoryInformation:
         DO_HIDE_FILE(PFILE_DIRECTORY_INFORMATION, infoLength, infoBuffer);
         break;
     case FileFullDirectoryInformation:
         DO_HIDE_FILE(PFILE_FULL_DIR_INFORMATION, infoLength, infoBuffer);
+        break;
+    case FileBothDirectoryInformation:
+        DO_HIDE_FILE(PFILE_BOTH_DIR_INFORMATION, infoLength, infoBuffer);
         break;
     case FileIdBothDirectoryInformation:
         DO_HIDE_FILE(PFILE_ID_BOTH_DIR_INFORMATION, infoLength, infoBuffer);

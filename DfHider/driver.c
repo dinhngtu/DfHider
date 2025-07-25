@@ -69,16 +69,17 @@ DriverEntry(
         DriverObject,
         &FilterRegistration,
         &g_DfHiderData.FilterHandle);
-
-    FLT_ASSERT(NT_SUCCESS(status));
-
     if (!NT_SUCCESS(status))
-        return status;
+        goto fail_register;
 
     status = FltStartFiltering(g_DfHiderData.FilterHandle);
     if (!NT_SUCCESS(status))
-        FltUnregisterFilter(g_DfHiderData.FilterHandle);
+        goto fail_start;
 
+fail_start:
+    FltUnregisterFilter(g_DfHiderData.FilterHandle);
+
+fail_register:
     return status;
 }
 
