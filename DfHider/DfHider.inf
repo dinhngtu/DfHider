@@ -1,49 +1,46 @@
 ;;;
 ;;; DfHider
 ;;;
-;;;
-;;; Copyright (c) 1999 - 2002, Microsoft Corporation
-;;;
 
 [Version]
-Signature   = "$Windows NT$"
-Class       = "ContentScreener"
-ClassGuid   = {3e3f0674-c83c-4558-bb26-9820e1eba5c5}
-Provider    = %ProviderString%
-DriverVer   =
-CatalogFile = dfhider.cat
-PnpLockdown = 1
+Signature="$Windows NT$"
+Class="ContentScreener"
+ClassGuid={3e3f0674-c83c-4558-bb26-9820e1eba5c5}
+Provider=%ProviderString%
+DriverVer=
+CatalogFile=dfhider.cat
+PnpLockdown=1
 
 
 [DestinationDirs]
-DefaultDestDir          = 12
-DfHider.DriverFiles  = 12            ;%windir%\system32\drivers
+DefaultDestDir=13
+DfHider.DriverFiles=13
 
 ;;
 ;; Default install sections
 ;;
 
-[DefaultInstall.NTamd64]
-OptionDesc  = %ServiceDescription%
-CopyFiles   = DfHider.DriverFiles
+[DefaultInstall.NTamd64.10.0...16299]
+OptionDesc=%ServiceDescription%
+CopyFiles=DfHider.DriverFiles
 
-[DefaultInstall.NTamd64.Services]
-AddService  = %ServiceName%,,DfHider.Service
+[DefaultInstall.NTamd64.10.0...16299.Services]
+AddService=%ServiceName%,,DfHider.Service
 
 ;
 ; Services Section
 ;
 
 [DfHider.Service]
-DisplayName      = %ServiceName%
-Description      = %ServiceDescription%
-ServiceBinary    = %12%\%DriverName%.sys    ;%windir%\system32\drivers\
-Dependencies     = "FltMgr"
-ServiceType      = 2                        ;SERVICE_FILE_SYSTEM_DRIVER
-StartType        = 3                        ;SERVICE_DEMAND_START
-ErrorControl     = 1                        ;SERVICE_ERROR_NORMAL
-LoadOrderGroup   = "FSFilter Content Screener"
-AddReg           = DfHider.AddRegistry
+DisplayName=%ServiceName%
+Description=%ServiceDescription%
+ServiceBinary=%13%\%DriverName%.sys
+Dependencies="FltMgr"
+ServiceType=2  ;SERVICE_FILE_SYSTEM_DRIVER
+StartType=3  ;SERVICE_DEMAND_START
+ErrorControl=1  ;SERVICE_ERROR_NORMAL
+LoadOrderGroup="FSFilter Content Screener"
+AddReg=DfHider.AddRegistry
 
 ;
 ; Registry Modifications
@@ -63,24 +60,24 @@ HKR,"Parameters\Instances\"%Instance1.Name%,"Flags",0x00010001,%Instance1.Flags%
 %DriverName%.sys
 
 [SourceDisksFiles]
-dfhider.sys = 1,,
+dfhider.sys=1,,
 
 [SourceDisksNames]
-1 = %DiskId1%,,,
+1=%DiskId1%,,,
 
 ;;
 ;; String Section
 ;;
 
 [Strings]
-ProviderString          = "DfHider-Provider"
-ServiceDescription      = "DfHider mini-filter driver"
-ServiceName             = "DfHider"
-DriverName              = "DfHider"
-DiskId1                 = "DfHider Device Installation Disk"
+ProviderString="DfHider-Provider"
+ServiceDescription="DfHider mini-filter driver"
+ServiceName="DfHider"
+DriverName="DfHider"
+DiskId1="DfHider Device Installation Disk"
 
 ;Instances specific information.
-DefaultInstance         = "DfHider Instance"
-Instance1.Name          = "DfHider Instance"
-Instance1.Altitude      = "268888"
-Instance1.Flags         = 0x0          ; Allow automatic attachments
+DefaultInstance="DfHider Instance"
+Instance1.Name="DfHider Instance"
+Instance1.Altitude="268888"
+Instance1.Flags=0x0          ; Allow automatic attachments
