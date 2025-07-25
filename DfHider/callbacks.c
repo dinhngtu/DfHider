@@ -2,7 +2,8 @@
 #include "callbacks.h"
 #include "instance.h"
 
-static BOOLEAN DfIsHiddenName(CONST PFLT_FILE_NAME_INFORMATION fnInfo)
+static BOOLEAN
+DfIsHiddenName(CONST PFLT_FILE_NAME_INFORMATION fnInfo)
 {
     if (!(fnInfo->NamesParsed & FLTFL_FILE_NAME_PARSED_STREAM) || !fnInfo->Stream.Length)
         if (fnInfo->FinalComponent.Length > 0 && fnInfo->FinalComponent.Buffer[0] == L'.')
@@ -10,7 +11,8 @@ static BOOLEAN DfIsHiddenName(CONST PFLT_FILE_NAME_INFORMATION fnInfo)
     return FALSE;
 }
 
-static NTSTATUS DfGetParsedFileName(
+static NTSTATUS
+DfGetParsedFileName(
     _In_ PFLT_CALLBACK_DATA CallbackData,
     _In_ FLT_FILE_NAME_OPTIONS NameOptions,
     _Outptr_ PFLT_FILE_NAME_INFORMATION* FileNameInformation
@@ -34,13 +36,12 @@ static NTSTATUS DfGetParsedFileName(
     return status;
 }
 
-FLT_POSTOP_CALLBACK_STATUS
+FLT_PREOP_CALLBACK_STATUS
 FLTAPI
-DfPostQueryInformation(
+DfPreQueryInformation(
     _Inout_ PFLT_CALLBACK_DATA Data,
     _In_ PCFLT_RELATED_OBJECTS FltObjects,
-    _In_opt_ PVOID CompletionContext,
-    _In_ FLT_POST_OPERATION_FLAGS Flags
+    _Outptr_result_maybenull_ PVOID* CompletionContext
 )
 {
     NTSTATUS status = Data->IoStatus.Status;
@@ -48,18 +49,16 @@ DfPostQueryInformation(
     FSRTL_MUP_PROVIDER_INFO_LEVEL_1 mupProvider = { 0 };
     ULONG mupProviderSize = sizeof(mupProvider);
     PFLT_FILE_NAME_INFORMATION fnInfo = NULL;
-    FILE_INFORMATION_CLASS infoClass;
-    PVOID infoBuffer;
+    BOOLEAN wantCallback = FALSE;
 
-    UNREFERENCED_PARAMETER(CompletionContext);
-    UNREFERENCED_PARAMETER(Flags);
+    *CompletionContext = NULL;
 
     if (!NT_SUCCESS(status))
-        return FLT_POSTOP_FINISHED_PROCESSING;
+        goto done;
 
     status = FltGetInstanceContext(FltObjects->Instance, &instance);
     if (!NT_SUCCESS(status))
-        return FLT_POSTOP_FINISHED_PROCESSING;
+        goto done;
 
     if (!instance->IsMup)
         goto done_context;
@@ -77,13 +76,42 @@ DfPostQueryInformation(
 
     status = DfGetParsedFileName(
         Data,
-        FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT,
+        FLT_FILE_NAME_OPENED | FLT_FILE_NAME_QUERY_DEFAULT,
         &fnInfo);
     if (!NT_SUCCESS(status))
         goto done_context;
 
     if (!DfIsHiddenName(fnInfo))
         goto done_fnInfo;
+
+    wantCallback = TRUE;
+
+done_fnInfo:
+    FltReleaseFileNameInformation(fnInfo);
+
+done_context:
+    FltReleaseContext(instance);
+
+done:
+    return wantCallback ? FLT_PREOP_SUCCESS_WITH_CALLBACK : FLT_PREOP_SUCCESS_NO_CALLBACK;
+}
+
+_IRQL_requires_(DISPATCH_LEVEL)
+FLT_POSTOP_CALLBACK_STATUS
+FLTAPI
+DfPostQueryInformation(
+    _Inout_ PFLT_CALLBACK_DATA Data,
+    _In_ PCFLT_RELATED_OBJECTS FltObjects,
+    _In_opt_ PVOID CompletionContext,
+    _In_ FLT_POST_OPERATION_FLAGS Flags
+)
+{
+    FILE_INFORMATION_CLASS infoClass;
+    PVOID infoBuffer;
+
+    UNREFERENCED_PARAMETER(FltObjects);
+    UNREFERENCED_PARAMETER(CompletionContext);
+    UNREFERENCED_PARAMETER(Flags);
 
     infoClass = Data->Iopb->Parameters.QueryFileInformation.FileInformationClass;
     infoBuffer = Data->Iopb->Parameters.QueryFileInformation.InfoBuffer;
@@ -102,51 +130,31 @@ DfPostQueryInformation(
         break;
     }
 
-done_fnInfo:
-    FltReleaseFileNameInformation(fnInfo);
-done_context:
-    FltReleaseContext(instance);
     return FLT_POSTOP_FINISHED_PROCESSING;
 }
 
-#define DO_HIDE_FILE(T, infoLength, infoBuffer) \
-    do { \
-        T di = (infoBuffer); \
-        while ((ULONG_PTR)(di + 1) <= (ULONG_PTR)(infoBuffer) + (ULONG_PTR)(infoLength)) { \
-            if (di->FileNameLength >= sizeof(WCHAR) && di->FileName[0] == L'.') \
-                di->FileAttributes |= FILE_ATTRIBUTE_HIDDEN; \
-            if (!di->NextEntryOffset) \
-                break; \
-            di = (T)((ULONG_PTR)di + di->NextEntryOffset); \
-        } \
-    } while (0)
-
-FLT_POSTOP_CALLBACK_STATUS
+FLT_PREOP_CALLBACK_STATUS
 FLTAPI
-DfPostDirectoryControl(
+DfPreDirectoryControl(
     _Inout_ PFLT_CALLBACK_DATA Data,
     _In_ PCFLT_RELATED_OBJECTS FltObjects,
-    _In_opt_ PVOID CompletionContext,
-    _In_ FLT_POST_OPERATION_FLAGS Flags
+    _Outptr_result_maybenull_ PVOID* CompletionContext
 )
 {
     NTSTATUS status = Data->IoStatus.Status;
     FSRTL_MUP_PROVIDER_INFO_LEVEL_1 mupProvider = { 0 };
     ULONG mupProviderSize = sizeof(mupProvider);
     PDF_INSTANCE_CONTEXT instance = NULL;
-    ULONG infoLength;
-    FILE_INFORMATION_CLASS infoClass;
-    PVOID infoBuffer;
+    BOOLEAN wantCallback = FALSE;
 
-    UNREFERENCED_PARAMETER(CompletionContext);
-    UNREFERENCED_PARAMETER(Flags);
+    *CompletionContext = NULL;
 
     if (Data->Iopb->MinorFunction != IRP_MN_QUERY_DIRECTORY)
-        return FLT_POSTOP_FINISHED_PROCESSING;
+        goto done;
 
     status = FltGetInstanceContext(FltObjects->Instance, &instance);
     if (!NT_SUCCESS(status))
-        return FLT_POSTOP_FINISHED_PROCESSING;
+        goto done;
 
     if (!instance->IsMup)
         goto done_context;
@@ -161,6 +169,45 @@ DfPostDirectoryControl(
 
     if (mupProvider.ProviderId != instance->P9ProviderId)
         goto done_context;
+
+    wantCallback = TRUE;
+
+done_context:
+    FltReleaseContext(instance);
+
+done:
+    return wantCallback ? FLT_PREOP_SUCCESS_WITH_CALLBACK : FLT_PREOP_SUCCESS_NO_CALLBACK;
+}
+
+#define DO_HIDE_FILE(T, infoLength, infoBuffer) \
+    do { \
+        T di = (infoBuffer); \
+        while ((ULONG_PTR)(di + 1) <= (ULONG_PTR)(infoBuffer) + (ULONG_PTR)(infoLength)) { \
+            if (di->FileNameLength >= sizeof(WCHAR) && di->FileName[0] == L'.') \
+                di->FileAttributes |= FILE_ATTRIBUTE_HIDDEN; \
+            if (!di->NextEntryOffset) \
+                break; \
+            di = (T)((ULONG_PTR)di + di->NextEntryOffset); \
+        } \
+    } while (0)
+
+_IRQL_requires_(DISPATCH_LEVEL)
+FLT_POSTOP_CALLBACK_STATUS
+FLTAPI
+DfPostDirectoryControl(
+    _Inout_ PFLT_CALLBACK_DATA Data,
+    _In_ PCFLT_RELATED_OBJECTS FltObjects,
+    _In_opt_ PVOID CompletionContext,
+    _In_ FLT_POST_OPERATION_FLAGS Flags
+)
+{
+    ULONG infoLength;
+    FILE_INFORMATION_CLASS infoClass;
+    PVOID infoBuffer;
+
+    UNREFERENCED_PARAMETER(FltObjects);
+    UNREFERENCED_PARAMETER(CompletionContext);
+    UNREFERENCED_PARAMETER(Flags);
 
     infoLength = Data->Iopb->Parameters.DirectoryControl.QueryDirectory.Length;
     infoClass = Data->Iopb->Parameters.DirectoryControl.QueryDirectory.FileInformationClass;
@@ -186,8 +233,6 @@ DfPostDirectoryControl(
         break;
     }
 
-done_context:
-    FltReleaseContext(instance);
     return FLT_POSTOP_FINISHED_PROCESSING;
 }
 

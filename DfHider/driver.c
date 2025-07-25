@@ -20,13 +20,13 @@ static CONST FLT_OPERATION_REGISTRATION Callbacks[] = {
     {
         IRP_MJ_QUERY_INFORMATION,
         0,
-        NULL,
+        DfPreQueryInformation,
         DfPostQueryInformation
     },
     {
         IRP_MJ_DIRECTORY_CONTROL,
         0,
-        NULL,
+        DfPreDirectoryControl,
         DfPostDirectoryControl
     },
     { IRP_MJ_OPERATION_END }
